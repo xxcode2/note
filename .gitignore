@@ -1,0 +1,29 @@
+# deps & build
+node_modules/
+dist/
+.vite/
+*.local
+
+# logs
+npm-debug.log*
+yarn-error.log*
+pnpm.log*
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# debug screenshots from browser testing
+/01-initial-load.png
+/02-current-modal.png
+/03-onboarding-building-step.png
+/04-verify-dom-vs-shot.png
+/05-onboarding-final-step.png
+/06-village-a.png
+/06-village-b.png
+/07-after-create-note-click.png
+/08-village-final.png
+/09-after-context-lost.png
+/10-after-reload.png
