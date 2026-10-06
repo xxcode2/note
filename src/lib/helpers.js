@@ -172,3 +172,17 @@ export const vibeFor = ({ total = 0, done = 0, pending = 0, overdue = 0 }) => {
   else if (total > 0) mood = 'busy'
   return { ratio, tier, allDone, overdue: overdue > 0, overdueCount: overdue, mood }
 }
+
+// ---------- chained notes (dependency: B hidden until A is completed) ----------
+export const isLocked = (note, notes) => {
+  const deps = note.dependsOn || []
+  if (!deps.length) return false
+  return deps.some((id) => { const d = notes.find((n) => n.id === id); return d && d.status !== 'Completed' })
+}
+export const blockersOf = (note, notes) => (note.dependsOn || [])
+  .map((id) => notes.find((n) => n.id === id))
+  .filter((d) => d && d.status !== 'Completed')
+
+// ---------- day-night that follows the real clock ----------
+export const envForHour = (h = new Date().getHours()) =>
+  h < 5 || h >= 19 ? 'night' : h < 7 || h >= 17 ? 'sunset' : 'day'

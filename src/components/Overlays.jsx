@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { useStore, allAttachments } from '../store.js'
 import { parseQuickAdd } from '../lib/nlp.js'
-import { colorOf, fmtDateTime } from '../lib/helpers.js'
+import { colorOf, fmtDateTime, isLocked } from '../lib/helpers.js'
 
 /* ================= Global search (Ctrl+K) ================= */
 export function SearchOverlay() {
@@ -22,6 +22,7 @@ export function SearchOverlay() {
     const catMatch = s.categories.filter((c) => (c.name + ' ' + c.description).toLowerCase().includes(query)).slice(0, 4)
     if (catMatch.length) groups.push({ label: 'Areas', items: catMatch.map((c) => ({ icon: c.icon, title: c.name, sub: `${s.notes.filter((n) => n.categoryId === c.id).length} notes`, go: () => s.navigate('category', { catId: c.id }) })) })
     const noteMatch = s.notes.filter((n) =>
+      !isLocked(n, s.notes) &&
       (n.title + ' ' + n.description + ' ' + n.tags.join(' ') + ' ' + n.status).toLowerCase().includes(query),
     ).slice(0, 8)
     if (noteMatch.length) groups.push({ label: 'Notes', items: noteMatch.map((n) => ({ icon: n.icon || '📝', title: n.title, sub: `${n.status} · ${s.categories.find((c) => c.id === n.categoryId)?.name || 'No area'}`, go: () => s.setUi({ detailNoteId: n.id }) })) })

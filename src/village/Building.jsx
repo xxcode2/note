@@ -1,9 +1,53 @@
-import React, { useRef, useState, useMemo } from 'react'
+import React, { useRef, useState, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Html, Billboard, Text } from '@react-three/drei'
+import { Html, Billboard } from '@react-three/drei'
 import * as THREE from 'three'
 import { useStore } from '../store.js'
 import { colorOf, slotPosition, vibeFor } from '../lib/helpers.js'
+
+/* ------------------------------------------------------------------ */
+/* Offline-safe name sign: draw the label onto a canvas texture        */
+/* (drei's <Text> needs a webfont and shows a black box when offline)  */
+/* ------------------------------------------------------------------ */
+function makeSignTexture(text, accent) {
+  const dpr = 2
+  const fontPx = 46
+  const padX = 30
+  const h = 100
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  const font = `800 ${fontPx}px system-ui, "Segoe UI", Roboto, Arial, sans-serif`
+  ctx.font = font
+  const w = Math.min(1024, Math.ceil(ctx.measureText(text).width) + padX * 2)
+  canvas.width = w * dpr
+  canvas.height = h * dpr
+  ctx.scale(dpr, dpr)
+  const r = 24
+  ctx.beginPath()
+  ctx.moveTo(r, 0)
+  ctx.arcTo(w, 0, w, h, r)
+  ctx.arcTo(w, h, 0, h, r)
+  ctx.arcTo(0, h, 0, 0, r)
+  ctx.arcTo(0, 0, w, 0, r)
+  ctx.closePath()
+  ctx.fillStyle = 'rgba(15,21,31,0.9)'
+  ctx.fill()
+  ctx.lineWidth = 3
+  ctx.strokeStyle = accent
+  ctx.stroke()
+  ctx.font = font
+  ctx.fillStyle = '#f4f7ff'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.shadowColor = 'rgba(0,0,0,0.55)'
+  ctx.shadowBlur = 6
+  ctx.fillText(text, w / 2, h / 2 + 2, w - padX)
+  const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 4
+  tex.needsUpdate = true
+  return { tex, w, h }
+}
 
 /* ------------------------------------------------------------------ */
 /* Procedural low-poly building models                                 */
@@ -319,9 +363,10 @@ export default function Building({ cat, stats, editable }) {
   // face the plaza centre by default so every door/sign reads from the middle of the village
   const rot = cat.building?.rotation ?? (Math.hypot(pos[0], pos[1]) > 0.6 ? Math.atan2(-pos[0], -pos[1]) : 0)
   const topY = cat.building?.type === 'tower' ? 4.5 : 3.05
-  const boardW = Math.min(4.2, Math.max(1.4, (cat.name || '').length * 0.2 + 0.9))
   const vibe = useMemo(() => vibeFor(stats), [stats])
   const ringHex = vibe.overdue ? '#ff5f6d' : vibe.allDone ? '#7de39a' : palette.hex
+  const sign = useMemo(() => makeSignTexture(cat.name || 'Ruang', palette.hex), [cat.name, palette.hex])
+  useEffect(() => () => sign.tex?.dispose(), [sign])
 
   useFrame(({ clock }, dt) => {
     const g = groupRef.current
@@ -439,26 +484,11 @@ export default function Building({ cat, stats, editable }) {
       )}
       {/* permanent dimensional name sign hovering over the building */}
       {cat.name && !(hovered && !walkMode) && !isNear && (
-        <Billboard position={[0, topY, 0]} follow>
-          <mesh position={[0, 0, -0.02]}>
-            <planeGeometry args={[boardW, 0.66]} />
-            <meshBasicMaterial color={palette.hex} transparent opacity={0.22} />
+        <Billboard position={[0, topY, 0]}>
+          <mesh>
+            <planeGeometry args={[0.66 * (sign.w / sign.h), 0.66]} />
+            <meshBasicMaterial map={sign.tex} transparent toneMapped={false} />
           </mesh>
-          <mesh position={[0, 0, -0.01]}>
-            <planeGeometry args={[boardW - 0.12, 0.54]} />
-            <meshBasicMaterial color="#141b26" transparent opacity={0.82} />
-          </mesh>
-          <Text
-            value={cat.name}
-            fontSize={0.3}
-            color="#f4f7ff"
-            anchorX="center"
-            anchorY="middle"
-            maxWidth={boardW - 0.2}
-            outlineWidth={0.012}
-            outlineColor="#0b1220"
-            position={[0, 0, 0.01]}
-          />
         </Billboard>
       )}
       {((hovered && !walkMode) || editable || isNear) && !drag.current && (

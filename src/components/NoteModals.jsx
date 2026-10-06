@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { format, parseISO, isValid } from 'date-fns'
 import { useStore } from '../store.js'
 import { Modal, Seg, ColorSwatches, EmojiPick } from './Kit.jsx'
-import { STATUSES, STATUS_DOT, PRIORITIES, PRIORITY_META, ICON_CHOICES, colorOf, fmtDateTime, uid, fileToDataUrl, relDeadline } from '../lib/helpers.js'
+import { STATUSES, STATUS_DOT, PRIORITIES, PRIORITY_META, ICON_CHOICES, colorOf, fmtDateTime, uid, fileToDataUrl, relDeadline, isLocked } from '../lib/helpers.js'
 
 const toLocalInput = (iso) => {
   if (!iso) return ''
@@ -32,7 +32,7 @@ export function NoteEditor() {
             tagsText: (defaults.tags || []).join(' '), status: s.settings.defaultStatus,
             priority: defaults.priority || s.settings.defaultPriority, dueDate: defaults.dueDate || null,
             icon: '📝', color: null, important: false, checklist: defaults.checklist || [],
-            attachments: defaults.attachments || [], remind: false,
+            attachments: defaults.attachments || [], dependsOn: defaults.dependsOn || [], remind: false,
           },
     )
   }, [open, noteId]) // eslint-disable-line
@@ -128,6 +128,31 @@ export function NoteEditor() {
             <ColorSwatches value={f.color} onChange={(color) => set({ color: color === f.color ? null : color })} />
           </div>
         </div>
+
+        {/* chained notes: hidden until chosen prerequisites are completed */}
+        {(() => {
+          const candidates = s.notes.filter((n) => n.id !== noteId && n.status !== 'Completed' && !isLocked(n, s.notes))
+          return (
+            <div>
+              <div className="lbl muted small" style={{ marginBottom: 6, fontWeight: 700 }}>Muncul setelah catatan ini selesai (berantai · opsional)</div>
+              {candidates.length === 0
+                ? <span className="muted small">Belum ada catatan lain yang bisa dijadikan prasyarat.</span>
+                : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {candidates.map((n) => {
+                      const on = (f.dependsOn || []).includes(n.id)
+                      return (
+                        <span key={n.id} className={'chip pick' + (on ? ' sel' : '')} onClick={() => set({ dependsOn: on ? f.dependsOn.filter((x) => x !== n.id) : [...(f.dependsOn || []), n.id] })}>
+                          {on ? '🔓' : '○'} {n.icon || '📝'} {n.title.slice(0, 26)}
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+              {(f.dependsOn || []).length > 0 && <div className="muted small" style={{ marginTop: 5 }}>🔒 Catatan ini disembunyikan sampai semua prasyarat di atas berstatus Selesai.</div>}
+            </div>
+          )
+        })()}
 
         {/* attachments */}
         <div>
@@ -261,7 +286,7 @@ export function NoteDetail() {
               <button className="btn ghost" onClick={() => { s.setUi({ detailNoteId: null, editor: { open: true, noteId: note.id, defaults: {} } }) }}>✎ Edit</button>
               <button className="btn ghost" onClick={() => s.duplicateNote(note.id)}>⧉ Duplicate</button>
               <button className="btn ghost" onClick={() => { s.updateNote(note.id, { status: 'Archived' }); s.setUi({ detailNoteId: null }) }}>🗄 Archive</button>
-              <button className="btn danger" onClick={() => { if (confirm('Delete this note for good?')) { s.deleteNote(note.id); s.setUi({ detailNoteId: null }) } }}>🗑 Delete</button>
+              <button className="btn danger" onClick={() => { s.deleteNote(note.id); s.setUi({ detailNoteId: null }) }}>🗑 Delete</button>
             </div>
           </div>
         </>

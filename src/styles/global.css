@@ -286,7 +286,11 @@ label.field > :first-child, label.field span.lbl { letter-spacing: .02em; }
 /* toasts */
 .toast-stack { position: fixed; top: 76px; right: 18px; z-index: 90; display: flex; flex-direction: column; gap: 10px; width: min(340px, calc(100vw - 36px)); }
 .toast { border-radius: var(--r-md); padding: 12px 14px; font-size: 13px; font-weight: 600;
-  background: var(--glass-strong); border: 1px solid var(--border-strong); box-shadow: var(--shadow-sm); backdrop-filter: blur(24px); }
+  background: var(--glass-strong); border: 1px solid var(--border-strong); box-shadow: var(--shadow-sm); backdrop-filter: blur(24px);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.toast-action { margin-left: auto; border: 1px solid var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 999px; padding: 5px 14px; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+.toast-action:hover { background: color-mix(in srgb, var(--accent) 26%, transparent); }
 .toast .sub { color: var(--ink-1); font-weight: 500; font-size: 12px; margin-top: 2px; }
 .toast.xp { border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
 .toast.xp .xp-chip { display: inline-block; margin-left: 8px; color: var(--ok); font-weight: 800; }

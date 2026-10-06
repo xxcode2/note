@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useStore } from '../store.js'
-import { colorOf, richIcon, relDeadline, STATUS_DOT } from '../lib/helpers.js'
+import { colorOf, richIcon, relDeadline, STATUS_DOT, isLocked } from '../lib/helpers.js'
 import IconBadge from './IconBadge.jsx'
 
 /* Immersive 3D "inside the building" stage — notes become floating,
@@ -11,8 +11,10 @@ export default function HoloNotes({ catId }) {
   const cat = s.categories.find((c) => c.id === catId)
   if (!cat) return null
   const accent = colorOf(cat.color).hex
-  const notes = s.notes
-    .filter((n) => n.categoryId === catId)
+  const all = s.notes.filter((n) => n.categoryId === catId)
+  const lockedCount = all.filter((n) => isLocked(n, s.notes)).length
+  const notes = all
+    .filter((n) => !isLocked(n, s.notes))
     .sort((a, b) => (a.status === 'Completed') - (b.status === 'Completed'))
   const stats = {
     total: notes.length,
@@ -45,6 +47,10 @@ export default function HoloNotes({ catId }) {
         <button className="icon-btn" title="Renovate / delete this area" onClick={() => s.setUi({ catEditor: { open: true, catId } })}>🛠</button>
         <button className="icon-btn" title="Back to village" onClick={() => s.navigate('village')}>↩</button>
       </div>
+
+      {lockedCount > 0 && (
+        <div className="muted small" style={{ padding: '0 2px 10px' }}>🔒 {lockedCount} catatan berantai masih terkunci — selesai catatan sebelumnya untuk memunculkannya.</div>
+      )}
 
       {notes.length === 0 ? (
         <div className="holo-empty">

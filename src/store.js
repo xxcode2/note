@@ -1,13 +1,14 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { idbStorage } from './lib/idb.js'
-import { uid, slotAt, PRIORITY_META, kindOfFile } from './lib/helpers.js'
+import { uid, slotAt, PRIORITY_META, kindOfFile, isLocked } from './lib/helpers.js'
 
 const defaultSettings = {
   theme: 'dark',            // dark | light | auto
   environment: 'day',       // day | sunset | night
   weather: 'clear',         // clear | rain | snow | off
   camera: 'isometric',      // isometric | free | minimal
+  autoEnv: false,           // follow the real clock (day/sunset/night)
   animations: 'full',       // full | reduced | off
   enable3D: true,
   shadows: true,
@@ -90,6 +91,14 @@ const seedDemo = () => {
     checklist: n.chk.map(([text, done]) => ({ id: uid(), text, done })),
     attachments: [], createdAt: now.toISOString(), updatedAt: now.toISOString(),
   }))
+  // demo chain: this note stays hidden until "Perpanjang BPJS Kesehatan" is completed
+  const bpjs = notes.find((n) => n.title.startsWith('Perpanjang BPJS'))
+  notes.push({
+    id: uid(), title: 'Klaim rawat inap (setelah kartu aktif)', description: 'Catatan berantai — muncul begitu perpanjangan BPJS selesai.',
+    categoryId: cid('health'), icon: '🏥', color: null, tags: ['bpjs', 'klaim'], status: 'Todo', priority: 'Medium',
+    important: false, pinned: false, dueDate: d(12), reminder: null, checklist: [], dependsOn: bpjs ? [bpjs.id] : [],
+    attachments: [], createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  })
   const reminders = [
     { id: uid(), title: 'Bayar iuran BPJS', repeat: 'monthly', dateOfMonth: 1, time: '09:00', active: true, lastFired: null, note: 'Cek aplikasi BPJS sebelum bayar.', createdAt: now.toISOString() },
     { id: uid(), title: 'Update progress kerja', repeat: 'weekly', dayOfWeek: 1, time: '10:00', active: true, lastFired: null, note: 'Every Monday standup notes.', createdAt: now.toISOString() },
@@ -189,6 +198,7 @@ export const useStore = create(
           reminder: data.reminder || null,
           attachments: data.attachments || [],
           checklist: data.checklist || [],
+          dependsOn: data.dependsOn || [],
           color: data.color || null,
           icon: data.icon || '📝',
           important: data.important || false,
@@ -203,7 +213,20 @@ export const useStore = create(
         set((s) => ({
           notes: s.notes.map((n) => (n.id === id ? { ...n, ...patch, updatedAt: new Date().toISOString() } : n)),
         })),
-      deleteNote: (id) => set((s) => ({ notes: s.notes.filter((n) => n.id !== id) })),
+      deleteNote: (id) => {
+        const s = get()
+        const idx = s.notes.findIndex((n) => n.id === id)
+        if (idx < 0) return
+        const note = s.notes[idx]
+        set({ notes: s.notes.filter((n) => n.id !== id) })
+        get().toast(`🗑 "${note.title}" dihapus`, {
+          type: 'notify', ttl: 6500,
+          action: { label: 'Undo', onClick: () => {
+            set((st) => { const arr = [...st.notes]; arr.splice(Math.min(idx, arr.length), 0, note); return { notes: arr } })
+            get().toast('↩ Catatan dikembalikan', { type: 'ok', ttl: 2000 })
+          } },
+        })
+      },
       duplicateNote: (id) => {
         const n = get().notes.find((x) => x.id === id)
         if (n) get().addNote({ ...n, title: n.title + ' (copy)', status: 'Inbox', dueDate: n.dueDate })
@@ -213,13 +236,12 @@ export const useStore = create(
         const n = s.notes.find((x) => x.id === id)
         if (!n || n.status === 'Completed') return
         get().updateNote(id, { status: 'Completed' })
-        if (s.settings.gamification) {
-          const gain = PRIORITY_META[n.priority]?.xp ?? 10
-          set({ xp: s.xp + gain })
-          get().toast(`${n.title} complete!   +${gain} progress`, { type: 'xp', noteIcon: n.icon })
-        } else {
-          get().toast(`${n.icon} ${n.title} completed`, { type: 'ok' })
-        }
+        if (s.settings.gamification) get().toast(`${n.icon} ${n.title} — selesai!`, { type: 'ok' })
+        else get().toast(`${n.icon} ${n.title} completed`, { type: 'ok' })
+        // reveal any chained notes this just unlocked
+        const after = get().notes
+        const unlocked = after.filter((x) => (x.dependsOn || []).includes(id) && !isLocked(x, after))
+        if (unlocked.length) get().toast(`🔓 ${unlocked.length} catatan terbuka: ${unlocked.map((u) => u.title).join(', ')}`, { type: 'ok', ttl: 4600 })
       },
       toggleCheck: (noteId, itemId) =>
         set((s) => ({

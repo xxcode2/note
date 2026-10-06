@@ -1,21 +1,49 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { isToday, parseISO, isValid, addDays, differenceInCalendarDays } from 'date-fns'
 import { useStore } from '../store.js'
 import NoteCard from '../components/NoteCard.jsx'
 import { Empty, Chip } from '../components/Kit.jsx'
-import { colorOf, STATUS_DOT, STATUSES } from '../lib/helpers.js'
+import { colorOf, STATUS_DOT, STATUSES, isLocked, PRIORITIES, PRIORITY_META } from '../lib/helpers.js'
+
+const PRI_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 }
 
 /* ==================== All Notes / Important ==================== */
 export function AllNotes({ importantOnly }) {
   const s = useStore()
   const [cat, setCat] = useState('all')
   const [st, setSt] = useState('all')
+  const [smart, setSmart] = useState(null)   // null | 'overdue' | 'today' | 'week' | priority label
+  const [sort, setSort] = useState('recent') // recent | due | priority
+  const now = new Date()
+
   let notes = [...s.notes]
   if (importantOnly) notes = notes.filter((n) => n.important)
+  // chained notes stay hidden until their blocker is completed
+  notes = notes.filter((n) => !isLocked(n, s.notes))
   if (cat !== 'all') notes = notes.filter((n) => (cat === 'none' ? !n.categoryId : n.categoryId === cat))
   if (st !== 'all') notes = notes.filter((n) => n.status === st)
   notes = notes.filter((n) => !['Archived'].includes(n.status) || st === 'Archived')
-  notes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || new Date(b.updatedAt) - new Date(a.updatedAt))
+
+  const isOpen = (n) => !['Completed', 'Archived'].includes(n.status)
+  if (smart === 'overdue') notes = notes.filter((n) => n.dueDate && isOpen(n) && parseISO(n.dueDate) < now)
+  else if (smart === 'today') notes = notes.filter((n) => n.dueDate && isOpen(n) && isToday(parseISO(n.dueDate)))
+  else if (smart === 'week') notes = notes.filter((n) => n.dueDate && isOpen(n) && differenceInCalendarDays(parseISO(n.dueDate), now) >= 0 && parseISO(n.dueDate) <= addDays(now, 7))
+  else if (smart) notes = notes.filter((n) => n.priority === smart)
+
+  if (sort === 'due') notes.sort((a, b) => (a.dueDate ? +parseISO(a.dueDate) : 9e15) - (b.dueDate ? +parseISO(b.dueDate) : 9e15))
+  else if (sort === 'priority') notes.sort((a, b) => (PRI_ORDER[a.priority] ?? 9) - (PRI_ORDER[b.priority] ?? 9))
+  else notes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || new Date(b.updatedAt) - new Date(a.updatedAt))
+
+  const cntOverdue = s.notes.filter((n) => !isLocked(n, s.notes) && n.dueDate && isOpen(n) && parseISO(n.dueDate) < now).length
+  const cntToday = s.notes.filter((n) => !isLocked(n, s.notes) && n.dueDate && isOpen(n) && isToday(parseISO(n.dueDate))).length
+  const cntWeek = s.notes.filter((n) => !isLocked(n, s.notes) && n.dueDate && isOpen(n) && differenceInCalendarDays(parseISO(n.dueDate), now) >= 0 && parseISO(n.dueDate) <= addDays(now, 7)).length
+
+  const smartChip = (key, label, n) => (
+    <span key={key} className={'chip pick' + (smart === key ? ' sel' : '')} onClick={() => setSmart(smart === key ? null : key)}>
+      {label}{n > 0 && <b style={{ marginLeft: 5, opacity: .7 }}>{n}</b>}
+    </span>
+  )
 
   return (
     <div className="pad">
@@ -27,8 +55,25 @@ export function AllNotes({ importantOnly }) {
         <button className="btn primary" style={{ marginLeft: 'auto' }} onClick={() => s.setUi({ editor: { open: true, noteId: null, defaults: {} } })}>＋ New note</button>
       </div>
 
+      {/* smart filters + sort */}
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', margin: '18px 0 6px', alignItems: 'center' }}>
+        <span className="muted small" style={{ fontWeight: 700 }}>Pintar:</span>
+        {smartChip('overdue', '⏰ Overdue', cntOverdue)}
+        {smartChip('today', '📅 Hari ini', cntToday)}
+        {smartChip('week', '🗓 Minggu ini', cntWeek)}
+        {PRIORITIES.slice().reverse().map((p) => (
+          <span key={p} className={'chip pick' + (smart === p ? ' sel' : '')} onClick={() => setSmart(smart === p ? null : p)}>
+            <i className="dot" style={{ background: PRIORITY_META[p].color }} /> {p}
+          </span>
+        ))}
+        <span className="muted small" style={{ marginLeft: 'auto', fontWeight: 700 }}>Urutkan:</span>
+        {[['recent', 'Terbaru'], ['due', 'Deadline'], ['priority', 'Prioritas']].map(([k, lbl]) => (
+          <span key={k} className={'chip pick' + (sort === k ? ' sel' : '')} onClick={() => setSort(k)}>{lbl}</span>
+        ))}
+      </div>
+
       {/* area rail — drop targets */}
-      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', margin: '18px 0 6px' }}>
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', margin: '6px 0' }}>
         <span className={'chip pick' + (cat === 'all' ? ' sel' : '')} onClick={() => setCat('all')}>All areas</span>
         {s.categories.map((c) => (
           <span
@@ -53,7 +98,7 @@ export function AllNotes({ importantOnly }) {
       </div>
 
       {notes.length === 0
-        ? <Empty emoji="🍃" title="No notes here" text={importantOnly ? 'Star a note to make it important.' : 'Nothing matches this filter — or your village is still quiet.'}
+        ? <Empty emoji="🍃" title="No notes here" text={smart ? 'Catatan di filter ini kosong — coba ubah penyaring pintar.' : importantOnly ? 'Star a note to make it important.' : 'Nothing matches this filter — or your village is still quiet.'}
             action={<button className="btn primary" onClick={() => s.setUi({ editor: { open: true, noteId: null, defaults: {} } })}>＋ Write your first note</button>} />
         : (
           <div className="grid notes">

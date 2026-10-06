@@ -41,6 +41,12 @@ export default function Toasts() {
                 {t.sub && <div className="sub">{t.sub}</div>}
               </>
             )}
+            {t.action && (
+              <button
+                className="toast-action"
+                onClick={(e) => { e.stopPropagation(); t.action.onClick(); dismiss(t.id) }}
+              >{t.action.label}</button>
+            )}
           </motion.div>
         ))}
       </AnimatePresence>

@@ -36,7 +36,8 @@ export default function SettingsPage() {
         <div className="set-grid">
           <div className="set-card">
             <Row label="Theme"><Seg options={['dark', 'light', 'auto']} value={st.theme} onChange={(theme) => s.updateSettings({ theme })} /></Row>
-            <Row label="Environment" hint="The mood of your village sky"><Seg options={['day', 'sunset', 'night']} value={st.environment} onChange={(environment) => s.updateSettings({ environment })} labels={['☀️ Day', '🌇 Sunset', '🌙 Night']} /></Row>
+            <Row label="Environment" hint="The mood of your village sky"><Seg options={['day', 'sunset', 'night']} value={st.environment} onChange={(environment) => s.updateSettings({ environment, autoEnv: false })} labels={['☀️ Day', '🌇 Sunset', '🌙 Night']} /></Row>
+            <Row label="Ikuti jam nyata" hint="Langit desa otomatis berubah pagi/siang/senja/malam sesuai waktu laptop"><Switch on={st.autoEnv} onChange={(autoEnv) => s.updateSettings({ autoEnv })} /></Row>
             <Row label="Weather"><Seg options={['clear', 'rain', 'snow', 'off']} value={st.weather} onChange={(weather) => s.updateSettings({ weather })} labels={['Clear', '🌧 Rain', '❄ Snow', 'Off']} /></Row>
           </div>
           <div className="set-card">

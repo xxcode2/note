@@ -1,7 +1,7 @@
 import React, { useEffect, useState, lazy, Suspense, Component } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStore } from './store.js'
-import { colorOf } from './lib/helpers.js'
+import { colorOf, envForHour } from './lib/helpers.js'
 import { startReminderEngine } from './lib/reminderEngine.js'
 import VillageCanvas from './village/VillageCanvas.jsx'
 import { TopBar, Sidebar, BottomNav } from './components/Nav.jsx'
@@ -13,7 +13,7 @@ import HoloNotes from './components/HoloNotes.jsx'
 import WalkPrompt from './pages/WalkPrompt.jsx'
 import Onboarding from './components/Onboarding.jsx'
 import Toasts from './components/Toasts.jsx'
-import { TodayDock, VillageTools, VillageScore, EmptyVillage } from './pages/VillageHud.jsx'
+import { TodayDock, VillageTools, EmptyVillage } from './pages/VillageHud.jsx'
 
 const AllNotes = lazy(() => import('./pages/Pages.jsx').then((m) => ({ default: m.AllNotes })))
 const CategoriesPage = lazy(() => import('./pages/Pages.jsx').then((m) => ({ default: m.CategoriesPage })))
@@ -101,6 +101,18 @@ export default function App() {
     document.body.classList.toggle('anim-off', s.settings.animations === 'off')
   }, [s.settings.animations])
 
+  // day-night follows the real clock when autoEnv is on
+  useEffect(() => {
+    if (!s.settings.autoEnv) return
+    const apply = () => {
+      const e = envForHour()
+      if (useStore.getState().settings.environment !== e) useStore.getState().updateSettings({ environment: e })
+    }
+    apply()
+    const t = setInterval(apply, 60000)
+    return () => clearInterval(t)
+  }, [s.settings.autoEnv])
+
   // keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
@@ -182,7 +194,6 @@ export default function App() {
             {show3D ? (
               <div className="village-hud">
                 <div style={{ flex: 1 }} />
-                {villagePage && s.categories.length > 0 && !s.ui.walkMode && <VillageScore key="score" />}
                 <AnimatePresence mode="wait">
                   {villagePage && s.categories.length === 0 && <EmptyVillage key="empty" />}
                   {villagePage && s.categories.length > 0 && !s.ui.walkMode && <TodayDock key="today" />}

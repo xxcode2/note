@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store.js'
 import { Modal, ColorSwatches, EmojiPick, Empty } from './Kit.jsx'
-import { BUILDING_TYPES, EMOJI_CHOICES, colorOf } from '../lib/helpers.js'
+import { BUILDING_TYPES, EMOJI_CHOICES, colorOf, isLocked } from '../lib/helpers.js'
 import BuildingModel from './Building3DPreview.jsx'
 import NoteCard from './NoteCard.jsx'
 
@@ -94,7 +94,9 @@ export function CategoryContent({ catId, dock }) {
   const s = useStore()
   const cat = s.categories.find((c) => c.id === catId)
   const [filter, setFilter] = useState('All')
-  const notes = s.notes.filter((n) => n.categoryId === catId)
+  const allCat = s.notes.filter((n) => n.categoryId === catId)
+  const lockedCount = allCat.filter((n) => isLocked(n, s.notes)).length
+  const notes = allCat.filter((n) => !isLocked(n, s.notes))
   if (!cat) return <Empty emoji="🌫️" title="This area vanished" text="It may have been demolished." action={<button className="btn" onClick={() => s.navigate('village')}>Back to village</button>} />
   const stats = {
     total: notes.length,
@@ -140,7 +142,7 @@ export function CategoryContent({ catId, dock }) {
           if (id) { s.moveNoteToCategory(id, catId); s.toast('📥 Note moved here', { type: 'ok' }) }
         }}>
         {shown.length === 0
-          ? <Empty emoji={cat.icon} title={`Nothing in ${cat.name} yet`} text="Drop a note here or create the first one." action={<button className="btn primary" onClick={() => s.setUi({ editor: { open: true, noteId: null, defaults: { categoryId: catId } } })}>＋ Create first note</button>} />
+          ? <Empty emoji={cat.icon} title={`Nothing in ${cat.name} yet`} text={lockedCount ? `${lockedCount} catatan berantai masih terkunci di sini.` : 'Drop a note here or create the first one.'} action={<button className="btn primary" onClick={() => s.setUi({ editor: { open: true, noteId: null, defaults: { categoryId: catId } } })}>＋ Create first note</button>} />
           : <div className="grid notes" style={{ paddingTop: 4 }}>{shown.map((n) => <NoteCard key={n.id} note={n} />)}</div>}
       </div>
     </div>

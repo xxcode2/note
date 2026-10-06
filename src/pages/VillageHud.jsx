@@ -2,14 +2,14 @@ import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { isToday, parseISO, isValid } from 'date-fns'
 import { useStore } from '../store.js'
-import { greetingFor, fmtDate, colorOf, relDeadline, levelFor } from '../lib/helpers.js'
+import { greetingFor, fmtDate, colorOf, relDeadline, isLocked } from '../lib/helpers.js'
 import { resetPlayer } from '../village/playerState.js'
 
 /* ============ The "Today" dock shown over the village ============ */
 export function TodayDock() {
   const s = useStore()
   const [collapsed, setCollapsed] = React.useState(false)
-  const active = s.notes.filter((n) => !['Completed', 'Archived'].includes(n.status))
+  const active = s.notes.filter((n) => !['Completed', 'Archived'].includes(n.status) && !isLocked(n, s.notes))
   const today = active.filter((n) => n.dueDate && isToday(parseISO(n.dueDate)))
   const upcoming = active
     .filter((n) => n.dueDate && parseISO(n.dueDate) > new Date())
@@ -94,33 +94,6 @@ export function TodayDock() {
   )
 }
 
-/* ============ Village level + score (top-left HUD) ============ */
-export function VillageScore() {
-  const s = useStore()
-  const lv = levelFor(s.xp)
-  const completed = s.notes.filter((n) => n.status === 'Completed').length
-  const overdue = s.notes.filter((n) => n.dueDate && !['Completed', 'Archived'].includes(n.status) && parseISO(n.dueDate) < new Date()).length
-  return (
-    <motion.div
-      className="village-score glass"
-      initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: 0.6, type: 'spring', stiffness: 300, damping: 26 }}
-    >
-      <div className="vs-head">
-        <span className="vs-lv">Lv {lv.level}</span>
-        <span className="vs-title">{lv.title}</span>
-      </div>
-      <div className="vs-bar"><div className="vs-fill" style={{ width: `${Math.round(lv.pct * 100)}%` }} /></div>
-      <div className="vs-sub muted small">{lv.into}/{lv.need} XP · next: {lv.next}</div>
-      <div className="vs-stats">
-        <span title="areas">🏘️ {s.categories.length}</span>
-        <span title="completed">✅ {completed}</span>
-        <span title="overdue" className={overdue ? 'bad' : ''}>⏰ {overdue}</span>
-      </div>
-    </motion.div>
-  )
-}
-
 /* ============ Floating tools on the right of the village ============ */
 export function VillageTools() {
   const s = useStore()
@@ -136,7 +109,9 @@ export function VillageTools() {
   const cycleEnv = () => {
     const order = ['day', 'sunset', 'night']
     const next = order[(order.indexOf(s.settings.environment) + 1) % 3]
-    s.updateSettings({ environment: next })
+    // manual pick pins the sky — stop following the real clock
+    s.updateSettings({ environment: next, autoEnv: false })
+    s.toast(`${next === 'day' ? '☀️' : next === 'sunset' ? '🌇' : '🌙'} Suasana manual — otomatis jam nyata dimatikan`, { type: 'notify', ttl: 2600 })
   }
   return (
     <motion.div
